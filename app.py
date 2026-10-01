@@ -2,6 +2,7 @@ import streamlit as st
 from google import genai
 from PIL import Image
 import io
+import base64
 
 # --- 1. SET UP THE SCREEN ---
 st.set_page_config(page_title="Instant Allergy Scanner", page_icon="🛡️", layout="centered")
@@ -35,16 +36,19 @@ if st.button("🔍 Analyze Ingredients Safety Now"):
             st.info("🔄 Connecting securely to Google AI servers...")
             
             try:
-                # 🏎️ Convert the raw image into the exact format Google requires
+                # Open the image file securely
                 img = Image.open(image_file)
-                img.thumbnail((1024, 1024)) # Keep it tiny for speed
+                img.thumbnail((1024, 1024)) # Shrink resolution for extreme speed
                 
-                # Convert the image to bytes
+                # 🏎️ SPEED & VALIDATION FIX: Convert image to a safe Base64 string
                 img_byte_arr = io.BytesIO()
                 img.convert("RGB").save(img_byte_arr, format='JPEG')
-                img_bytes = img_byte_arr.getvalue()
+                image_bytes = img_byte_arr.getvalue()
                 
-                # Configure the 2026 Google AI Client
+                # Google's new 2026 system requires decoding bytes to a UTF-8 string
+                base64_image = base64.b64encode(image_bytes).decode('utf-8')
+                
+                # Configure the Google AI Client
                 client = genai.Client(api_key=GEMINI_API_KEY)
                 
                 # Write strict instructions for the AI
@@ -57,16 +61,16 @@ if st.button("🔍 Analyze Ingredients Safety Now"):
                 3. List out any warning items in brief bullet points if dangerous.
                 """
                 
-                # Call the modern Interactions API with properly formatted image data
+                # Call the modern Interactions API using Google's exact Base64 structure
                 response = client.interactions.create(
                     model="gemini-3.8-flash",
                     input=[
                         {"type": "text", "text": prompt},
-                        {"type": "image", "data": img_bytes, "mime_type": "image/jpeg"}
+                        {"type": "image", "data": base64_image, "mime_type": "image/jpeg"}
                     ]
                 )
                 
-                # Display the beautiful text result on the phone!
+                # Display the clean text report on your screen
                 st.write("### 📜 AI Safety Report:")
                 st.write(response.output_text)
                 
