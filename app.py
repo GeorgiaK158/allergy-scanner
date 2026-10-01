@@ -5,8 +5,9 @@ import io
 import base64
 
 # --- 1. SET UP THE SCREEN ---
-st.set_page_config(page_title="Instant Allergy Scanner", page_icon="🛡️", layout="centered")
-st.title("🛡️ Instant Allergy Camera Scanner")
+st.set_page_config(page_title="Smart Allergy Scanner", page_icon="🛡️", layout="centered")
+st.title("🛡️ Smart Allergy Camera Scanner")
+st.write("Scan an ingredient panel to get instant color-coded safety reports and food alternatives.")
 
 # --- 2. LOAD YOUR SECRET PASSWORD SAFE ---
 try:
@@ -40,28 +41,27 @@ if st.button("🔍 Analyze Ingredients Safety Now"):
                 img = Image.open(image_file)
                 img.thumbnail((1024, 1024)) # Shrink resolution for extreme speed
                 
-                # 🏎️ SPEED & VALIDATION FIX: Convert image to a safe Base64 string
+                # Convert image to a safe Base64 string
                 img_byte_arr = io.BytesIO()
                 img.convert("RGB").save(img_byte_arr, format='JPEG')
                 image_bytes = img_byte_arr.getvalue()
-                
-                # Google's new 2026 system requires decoding bytes to a UTF-8 string
                 base64_image = base64.b64encode(image_bytes).decode('utf-8')
                 
                 # Configure the Google AI Client
                 client = genai.Client(api_key=GEMINI_API_KEY)
                 
-                # Write strict instructions for the AI
+                # Write strict instructions including our new alternatives feature
                 prompt = f"""
                 You are a dedicated allergy safety assistant. The user is strictly allergic to: {', '.join(selected_allergies)}.
                 
                 Look closely at this image of an ingredient list panel:
-                1. Meticulously check every word for direct matches or hidden derivatives (whey = dairy, lecithin = soy/egg, etc.).
-                2. Output a prominent bold header: either '🟢 SAFE' or '🔴 DANGEROUS'.
-                3. List out any warning items in brief bullet points if dangerous.
+                1. Meticulously check every word for direct matches or hidden derivatives.
+                2. On the VERY FIRST LINE of your response, write exactly "VERDICT: SAFE" or "VERDICT: DANGEROUS". Do not put any text before this.
+                3. On the next lines, list out any warning items in brief bullet points if dangerous.
+                4. If the item is DANGEROUS, provide a section called '🔄 Recommended Alternatives' listing 2-3 popular, widely available alternative brands or products that are famously free from these specific allergens.
                 """
                 
-                # Call the modern Interactions API using Google's exact Base64 structure
+                # Call the modern Interactions API
                 response = client.interactions.create(
                     model="gemini-3.8-flash",
                     input=[
@@ -70,9 +70,25 @@ if st.button("🔍 Analyze Ingredients Safety Now"):
                     ]
                 )
                 
-                # Display the clean text report on your screen
+                ai_output = response.output_text
+                
                 st.write("### 📜 AI Safety Report:")
-                st.write(response.output_text)
+                
+                # 🎨 COLOR-CODING LOGIC:
+                # We check the first line of the AI's response to color the screen dynamically
+                if "VERDICT: SAFE" in ai_output:
+                    # Clean up the verdict text prefix for display
+                    clean_report = ai_output.replace("VERDICT: SAFE", "")
+                    st.success("🟢 **SAFE PRODUCT**")
+                    st.write(clean_report)
+                elif "VERDICT: DANGEROUS" in ai_output:
+                    clean_report = ai_output.replace("VERDICT: DANGEROUS", "")
+                    st.error("🔴 **DANGEROUS PRODUCT DETECTED**")
+                    st.write(clean_report)
+                else:
+                    # Fallback if the AI didn't follow the formatting rule perfectly
+                    st.warning("⚠️ **Safety Analysis Complete:**")
+                    st.write(ai_output)
                 
             except Exception as e:
                 st.error(f"Something went wrong inside the server: {e}")
