@@ -1,15 +1,10 @@
 import streamlit as st
 import google.generativeai as genai
-from PIL import Image
-
-import streamlit as st
-import google.generativeai as genai
-from PIL import Image
-import io
 
 # --- CONFIGURATION & TITLE ---
-st.set_page_config(page_title="Allergy Chatbot", page_icon="🛡️", layout="centered")
-st.title("🛡️ Allergy Safety Scanner Bot")
+st.set_page_config(page_title="Instant Allergy Checker", page_icon="🛡️", layout="centered")
+st.title("🛡️ Instant Allergy Text Checker")
+st.write("Type or paste ingredients to check safety profiles instantly.")
 
 # --- STEP 1: LOAD PERMANENT SECRET KEY ---
 try:
@@ -24,48 +19,40 @@ selected_allergies = st.multiselect(
     ["Peanuts", "Tree Nuts", "Dairy (Milk/Whey)", "Gluten/Wheat", "Eggs", "Soy", "Fish/Shellfish", "Sesame"]
 )
 
-# --- STEP 2: PHOTO UPLOADER ---
-st.write("### 2. Take a Photo")
-image_file = st.file_uploader("Upload or Take a Photo of the ingredients list", type=["jpg", "jpeg", "png"])
+# --- STEP 2: INSTANT TEXT INPUT ---
+st.write("### 2. Enter Ingredients")
+user_text = st.text_area(
+    "Paste the ingredient text list here:", 
+    placeholder="Example: Enriched flour, sugar, whey protein, soy lecithin, natural flavors..."
+)
 
-# --- STEP 3: THE HIGH-SPEED VISION LOGIC ---
-if image_file is not None and len(selected_allergies) > 0:
-    st.info("🔄 Processing image swiftly...")
+# --- STEP 3: HIGH-SPEED TEXT PROCESSING LOGIC ---
+if st.button("Verify Ingredients Now") and len(selected_allergies) > 0 and user_text.strip() != "":
+    st.info("🔄 Checking profile...")
     
     try:
-        # Open the image file
-        raw_img = Image.open(image_file)
-        
-        # 🏎️ SPEED TRICK 1: Aggressive compression for instant uploading
-        # We shrink the image boundaries and lower the JPEG quality.
-        # This reduces an 8MB iPhone photo down to a tiny 150KB while keeping text readable!
-        raw_img.thumbnail((800, 800))
-        buffer = io.BytesIO()
-        raw_img.convert("RGB").save(buffer, format="JPEG", quality=60)
-        optimized_img = Image.open(buffer)
-        
-        # Initialize the high-speed flash model
+        # Initialize the flash text model
         model = genai.GenerativeModel('gemini-3.8-flash')
         
-        # 🏎️ SPEED TRICK 2: Stream the answer line-by-line instead of waiting for the full block
         prompt = f"""
-        You are an allergy safety bot. The user is allergic to: {', '.join(selected_allergies)}.
-        Read this ingredient panel snapshot. 
-        1. Explicitly output either '🟢 SAFE' or '🔴 DANGEROUS' in bold at the very top.
-        2. List any warning ingredient triggers found in short bullet points.
-        3. Print a quick transcription of the readable text.
+        You are a dedicated allergy safety bot. The user is strictly allergic to: {', '.join(selected_allergies)}.
+        
+        Meticulously analyze this ingredient list text for direct matches and hidden chemical derivatives:
+        "{user_text}"
+        
+        Format your response exactly like this:
+        **Verdict:** [🟢 SAFE or 🔴 DANGEROUS]
+        **Triggers found:** [List any ingredients that match or are derivatives, or write 'None']
+        **Explanation:** [A short one-sentence explanation of why it is safe or dangerous]
         """
         
-        st.write("### 📜 AI Safety Report:")
-        
-        # We use generate_content with stream=True so text chunks pop up instantly
-        response_stream = model.generate_content([prompt, optimized_img], stream=True)
-        
-        # Streamlit reads the live incoming words automatically
+        # Stream the pure text answer line-by-line
+        response_stream = model.generate_content(prompt, stream=True)
         st.write_stream(response_stream)
         
     except Exception as e:
         st.error(f"Something went wrong: {e}")
 
-elif image_file is not None and len(selected_allergies) == 0:
-    st.warning("⚠️ Please select at least one allergy above before scanning.")
+elif len(selected_allergies) == 0 and user_text.strip() != "":
+    st.warning("⚠️ Please select at least one allergy above before checking.")
+
